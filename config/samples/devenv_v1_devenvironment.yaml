@@ -1,0 +1,15 @@
+apiVersion: devenv.tunnel4.dev/v1
+kind: DevEnvironment
+metadata:
+  labels:
+    app.kubernetes.io/name: k8s-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: devenvironment-sample
+spec:
+  # TODO(user): Add fields here
+  developer: alice
+  branch: feature/test
+  intercepts:
+    - service: payments-service
+      localPort: 8080
+  developerTunnelIP: "10.8.0.2"
