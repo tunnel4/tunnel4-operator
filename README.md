@@ -1,137 +1,116 @@
-# k8s-operator
-// TODO(user): Add simple overview of use/purpose
+# tunnel4-operator
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+Kubernetes operator for [tun4.dev](https://tun4.dev) — hybrid dev environment platform.
+
+Manages the lifecycle of isolated developer namespaces in a shared K8s cluster. Each developer gets a dedicated namespace per git branch with stub pods that proxy traffic through the WireGuard tunnel to the developer's local machine.
+
+## Overview
+
+Part of the **tun4.dev** platform. When a developer runs `devenv up`, the local agent triggers creation of a `DevEnvironment` CR. This operator:
+
+1. Creates an isolated namespace (`dev-<developer>-<branch>`)
+2. Deploys stub pods for each intercepted service
+3. Monitors heartbeat and scales to zero after 30 min idle
+4. Cleans up all resources on deletion
+
+Traffic flow: `cluster service → stub pod → WireGuard tunnel → local machine → back`
+
+## Custom Resource
+
+```yaml
+apiVersion: devenv.tunnel4.dev/v1
+kind: DevEnvironment
+metadata:
+  name: devenvironment-sample
+spec:
+  developer: alice
+  branch: feature-payments
+  developerTunnelIP: 10.8.0.5   # assigned by WireGuard
+  intercepts:
+    - service: payments-svc
+      port: 8080
+    - service: notifications-svc
+      port: 9090
+  ttl: 8h                        # optional hard TTL
+```
+
+### Status Phases
+
+| Phase | Description |
+|-------|-------------|
+| `Provisioning` | Creating namespace and stub pods |
+| `Ready` | Environment running, monitoring heartbeat |
+| `Sleeping` | Idle >30 min — pods scaled to 0 |
+| `Terminating` | Deletion in progress |
+| `Failed` | Error state |
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.24.6+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+- Go v1.24+
+- Docker v17.03+
+- kubectl v1.11.3+
+- Kubernetes v1.11.3+ cluster (dev server: `187.124.157.227`)
 
-```sh
-make docker-build docker-push IMG=<some-registry>/k8s-operator:tag
-```
-
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
-
-**Install the CRDs into the cluster:**
+### Deploy
 
 ```sh
+# Build and push image
+make docker-build docker-push IMG=<registry>/tunnel4-operator:tag
+
+# Install CRDs
 make install
+
+# Deploy operator
+make deploy IMG=<registry>/tunnel4-operator:tag
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
-
-```sh
-make deploy IMG=<some-registry>/k8s-operator:tag
-```
-
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+### Try it
 
 ```sh
 kubectl apply -k config/samples/
+kubectl get devenvironment
+kubectl get ns -l tunnel4.dev/managed-by=operator
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+### Uninstall
 
 ```sh
 kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
 make uninstall
-```
-
-**UnDeploy the controller from the cluster:**
-
-```sh
 make undeploy
 ```
 
-## Project Distribution
+## Network Layout
 
-Following the options to release and provide this solution to the users.
+| Range | Purpose |
+|-------|---------|
+| `10.8.0.0/24` | WireGuard tunnel (local agents) |
+| `10.42.0.0/16` | Pod CIDR |
+| `10.43.0.0/16` | Service CIDR |
+| `10.43.0.10` | CoreDNS |
 
-### By providing a bundle with all YAML files
+## Architecture
 
-1. Build the installer for the image built and published in the registry:
+Each `DevEnvironment` owns:
+- **Namespace** — `dev-<developer>-<branch>`, labeled with `tunnel4.dev/*`
+- **ResourceQuota** — limits CPU/memory per environment
+- **NetworkPolicy** — isolates namespace traffic
+- **Stub Deployments + Services** — one per intercepted service, routes to `developerTunnelIP`
+- **TLS Certificates** — via cert-manager (optional)
 
-```sh
-make build-installer IMG=<some-registry>/k8s-operator:tag
-```
+The operator uses a finalizer (`tunnel4.dev/finalizer`) to ensure namespace cleanup on deletion.
 
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/k8s-operator/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
+## Development
 
 ```sh
-kubebuilder edit --plugins=helm/v2-alpha
+make run          # run controller locally against current kubeconfig
+make test         # run unit + integration tests
+make generate     # regenerate CRD manifests after API changes
+make help         # all available targets
 ```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
-
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-**NOTE:** Run `make help` for more information on all potential `make` targets
-
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
 
 ## License
 
-Copyright 2026.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-# tunnel4-operator
-# tunnel4-operator
+Copyright 2026. Licensed under the [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0).
