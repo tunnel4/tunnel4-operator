@@ -1,4 +1,4 @@
-module github.com/tunnel4/k8s-operator
+module github.com/tunnel4/tunnel4-operator
 
 go 1.25.0
 
