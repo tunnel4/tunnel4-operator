@@ -9,15 +9,29 @@ jobs:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
     steps:
-      - name: Clone the code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Running Tests
+      - name: Install setup-envtest
+        run: go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+      - name: Download envtest binaries
+        id: envtest
         run: |
-          go mod tidy
-          make test
+          KUBEBUILDER_ASSETS=$(setup-envtest use --bin-dir "${{ runner.temp }}/envtest-bins" -p path)
+          echo "assets=$KUBEBUILDER_ASSETS" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        env:
+          KUBEBUILDER_ASSETS: ${{ steps.envtest.outputs.assets }}
+        run: go test ./... -race -coverprofile=cover.out
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: cover.out
