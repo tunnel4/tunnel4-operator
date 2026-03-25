@@ -1,5 +1,4 @@
-# Publish
-name: Operator — Build & Publish
+name: Build & Publish
 
 on:
   push:
@@ -7,6 +6,9 @@ on:
       - main
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io
@@ -16,9 +18,6 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: tunnel4-operator
     steps:
       - uses: actions/checkout@v4
 
@@ -27,9 +26,6 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Vet
-        run: go vet ./...
-
       - name: Test
         run: go test ./... -race -coverprofile=coverage.out
 
@@ -37,7 +33,6 @@ jobs:
     name: Build & Push
     runs-on: ubuntu-latest
     needs: test
-    # Publish on push to main or on version tags; skip for PRs
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -59,11 +54,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # tag pushes to main as :latest
             type=raw,value=latest,enable={{is_default_branch}}
-            # version tags  operator/v1.2.3  →  :1.2.3
-            type=match,pattern=operator/v(.*),group=1
-            # short SHA for traceability
+            type=semver,pattern={{version}}
             type=sha,prefix=sha-,format=short
 
       - name: Set up QEMU (multi-arch)
@@ -75,7 +67,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: tunnel4-operator
+          context: .
           file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true

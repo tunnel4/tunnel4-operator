@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/tunnel4/k8s-operator/test/utils"
+	"github.com/tunnel4/tunnel4-operator/test/utils"
 )
 
 var (
@@ -42,7 +42,7 @@ var (
 
 	// projectImage is the name of the image which will be build and loaded
 	// with the code source changes to be tested.
-	projectImage = "example.com/k8s-operator:v0.0.1"
+	projectImage = "example.com/tunnel4-operator:v0.0.1"
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
@@ -51,7 +51,7 @@ var (
 // CertManager.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting k8s-operator integration test suite\n")
+	_, _ = fmt.Fprintf(GinkgoWriter, "Starting tunnel4-operator integration test suite\n")
 	RunSpecs(t, "e2e suite")
 }
 

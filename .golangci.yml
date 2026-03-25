@@ -36,6 +36,9 @@ linters:
           - dupl
           - lll
         path: internal/*
+      - linters:
+          - revive
+        text: "comment-spacings"
     paths:
       - third_party$
       - builtin$

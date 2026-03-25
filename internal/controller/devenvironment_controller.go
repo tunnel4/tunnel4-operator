@@ -80,7 +80,7 @@ func (r *DevEnvironmentReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 // provision — create everything for env
 func (r *DevEnvironmentReconciler) provision(ctx context.Context, devEnv *devenvv1.DevEnvironment) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
 	// Взять tunnelIP из spec
 	tunnelIP := devEnv.Spec.DeveloperTunnelIP
@@ -104,7 +104,7 @@ func (r *DevEnvironmentReconciler) provision(ctx context.Context, devEnv *devenv
 
 	// 1. Namespace
 	if err := r.ensureNamespace(ctx, devEnv, ns); err != nil {
-		log.Error(err, "failed to ensure namespace")
+		logger.Error(err, "failed to ensure namespace")
 		return ctrl.Result{}, r.setPhase(ctx, devEnv, devenvv1.PhaseFailed, err.Error())
 	}
 
@@ -132,7 +132,7 @@ func (r *DevEnvironmentReconciler) provision(ctx context.Context, devEnv *devenv
 
 	// 5. Cleanup удалённых intercepts
 	if err := r.cleanupOrphanedStubs(ctx, devEnv, ns); err != nil {
-		log.Error(err, "failed to cleanup orphaned stubs")
+		logger.Error(err, "failed to cleanup orphaned stubs")
 	}
 
 	// Обновить статус intercepts
@@ -423,7 +423,11 @@ func (r *DevEnvironmentReconciler) ensureStubPod(
 		}
 	} else if err == nil {
 		existingSvc.Spec.Selector = svc.Spec.Selector
-		r.Update(ctx, existingSvc)
+		if err := r.Update(ctx, existingSvc); err != nil {
+			status.Phase = devenvv1.InterceptError
+			status.Message = err.Error()
+			return status, fmt.Errorf("update service %s: %w", svc.Name, err)
+		}
 	}
 
 	return status, nil
@@ -455,7 +459,9 @@ func (r *DevEnvironmentReconciler) cleanupOrphanedStubs(ctx context.Context, dev
 			svcName := strings.TrimSuffix(stub.Name, "-stub")
 			svc := &corev1.Service{}
 			if err := r.Get(ctx, client.ObjectKey{Name: svcName, Namespace: ns}, svc); err == nil {
-				r.Delete(ctx, svc)
+				if err := r.Delete(ctx, svc); err != nil && !errors.IsNotFound(err) {
+					return err
+				}
 			}
 		}
 	}
@@ -475,7 +481,9 @@ func (r *DevEnvironmentReconciler) transitionToSleep(ctx context.Context, devEnv
 		d := &deployList.Items[i]
 		if *d.Spec.Replicas != 0 {
 			d.Spec.Replicas = &zero
-			r.Update(ctx, d)
+			if err := r.Update(ctx, d); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -492,7 +500,9 @@ func (r *DevEnvironmentReconciler) handleDeletion(ctx context.Context, devEnv *d
 	// Удалить namespace — все ресурсы удалятся каскадно
 	ns := &corev1.Namespace{}
 	if err := r.Get(ctx, client.ObjectKey{Name: devEnv.Status.Namespace}, ns); err == nil {
-		r.Delete(ctx, ns)
+		if err := r.Delete(ctx, ns); err != nil && !errors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 	}
 
 	// Убрать finalizer
@@ -582,7 +592,7 @@ func (r *DevEnvironmentReconciler) ensureCertificate(ctx context.Context, ns str
 				Algorithm: certmanagerv1.ECDSAKeyAlgorithm,
 				Size:      256,
 			},
-			IssuerRef: cmmeta.ObjectReference{
+			IssuerRef: cmmeta.ObjectReference{ //nolint:staticcheck // cert-manager v1 API still requires ObjectReference
 				Name: "devenv-issuer",
 				Kind: "ClusterIssuer",
 			},

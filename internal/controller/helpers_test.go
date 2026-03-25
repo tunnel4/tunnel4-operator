@@ -57,7 +57,7 @@ func TestBuildNamespace(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := buildNamespace(tt.developer, tt.branch)
@@ -87,7 +87,7 @@ func TestSanitizeLabel(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := sanitizeLabel(tt.input)
@@ -116,7 +116,7 @@ func TestContainsString(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := containsString(tt.slice, tt.s)
@@ -180,7 +180,7 @@ func TestRemoveString(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := removeString(tt.slice, tt.s)
@@ -247,7 +247,7 @@ func TestIsIdle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := r.isIdle(tt.devEnv)
