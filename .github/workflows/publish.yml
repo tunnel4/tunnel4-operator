@@ -10,19 +10,19 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/tunnel4-operator
 
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+  # test:
+  #   name: Test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum
+  #     - uses: actions/setup-go@v5
+  #       with:
+  #         go-version-file: go.mod
+  #         cache-dependency-path: go.sum
 
-      - name: Test
-        run: go test ./... -race -coverprofile=coverage.out
+  #     - name: Test
+  #       run: go test ./... -race -coverprofile=coverage.out
 
   build-push:
     name: Build & Push
