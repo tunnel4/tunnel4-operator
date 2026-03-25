@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	devenvv1 "github.com/tunnel4/k8s-operator/api/v1"
+	devenvv1 "github.com/tunnel4/tunnel4-operator/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 

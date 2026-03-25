@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	devenvv1 "github.com/tunnel4/k8s-operator/api/v1"
+	devenvv1 "github.com/tunnel4/tunnel4-operator/api/v1"
 )
 
 var _ = Describe("DevEnvironment Controller", func() {

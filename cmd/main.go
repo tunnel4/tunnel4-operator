@@ -36,8 +36,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	devenvv1 "github.com/tunnel4/k8s-operator/api/v1"
-	"github.com/tunnel4/k8s-operator/internal/controller"
+	devenvv1 "github.com/tunnel4/tunnel4-operator/api/v1"
+	"github.com/tunnel4/tunnel4-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
 

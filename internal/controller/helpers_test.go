@@ -7,7 +7,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	devenvv1 "github.com/tunnel4/k8s-operator/api/v1"
+	devenvv1 "github.com/tunnel4/tunnel4-operator/api/v1"
 )
 
 func TestBuildNamespace(t *testing.T) {
