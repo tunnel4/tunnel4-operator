@@ -19,12 +19,15 @@ package controller
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,11 +65,17 @@ var _ = BeforeSuite(func() {
 	err = devenvv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = certmanagerv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "config", "crd", "bases"),
+			getCertManagerCRDPath(),
+		},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -91,6 +100,22 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+// getCertManagerCRDPath returns the path to cert-manager CRD YAML files from the module cache.
+func getCertManagerCRDPath() string {
+	goModCache := os.Getenv("GOMODCACHE")
+	if goModCache == "" {
+		out, err := exec.Command("go", "env", "GOMODCACHE").Output()
+		if err == nil {
+			goModCache = strings.TrimSpace(string(out))
+		}
+	}
+	if goModCache == "" {
+		home, _ := os.UserHomeDir()
+		goModCache = filepath.Join(home, "go", "pkg", "mod")
+	}
+	return filepath.Join(goModCache, "github.com/cert-manager/cert-manager@v1.20.0", "deploy", "crds")
+}
 
 // getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.
 // ENVTEST-based tests depend on specific binaries, usually located in paths set by

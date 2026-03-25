@@ -75,8 +75,9 @@ var _ = Describe("DevEnvironment Controller", func() {
 					Namespace: "default",
 				},
 				Spec: devenvv1.DevEnvironmentSpec{
-					Developer: "alice",
-					Branch:    "feature/stripe",
+					Developer:         "alice",
+					Branch:            "feature/stripe",
+					DeveloperTunnelIP: "10.8.0.2",
 					Intercepts: []devenvv1.Intercept{
 						{Service: "payments-service", LocalPort: 8080},
 						{Service: "webhook-service", LocalPort: 8081},
@@ -89,7 +90,28 @@ var _ = Describe("DevEnvironment Controller", func() {
 
 			Expect(k8sClient.Create(ctx, devEnv)).To(Succeed())
 
+			// First reconcile: adds finalizer, creates namespace/quota/netpol, waits for TLS secret
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: devName})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Pre-create TLS secrets so second reconcile can create stubs
+			for _, intercept := range devEnv.Spec.Intercepts {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      intercept.Service + "-stub-tls",
+						Namespace: devNS,
+					},
+					Data: map[string][]byte{
+						"tls.crt": []byte("cert"),
+						"tls.key": []byte("key"),
+						"ca.crt":  []byte("ca"),
+					},
+				}
+				Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+			}
+
+			// Second reconcile: TLS secrets present, creates stub deployments and services
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: devName})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -211,8 +233,10 @@ var _ = Describe("DevEnvironment Controller", func() {
 					Namespace: devName.Namespace,
 				},
 				Spec: devenvv1.DevEnvironmentSpec{
-					Developer: "bob",
-					Branch:    "main",
+					Developer:         "bob",
+					Branch:            "main",
+					DeveloperTunnelIP: "10.8.0.2",
+					Intercepts:        []devenvv1.Intercept{},
 				},
 			}
 			Expect(k8sClient.Create(ctx, devEnv)).To(Succeed())
@@ -263,8 +287,10 @@ var _ = Describe("DevEnvironment Controller", func() {
 					Namespace: devName.Namespace,
 				},
 				Spec: devenvv1.DevEnvironmentSpec{
-					Developer: "carol",
-					Branch:    "main",
+					Developer:         "carol",
+					Branch:            "main",
+					DeveloperTunnelIP: "10.8.0.2",
+					Intercepts:        []devenvv1.Intercept{},
 				},
 			}
 			Expect(k8sClient.Create(ctx, devEnv)).To(Succeed())
@@ -334,8 +360,9 @@ var _ = Describe("DevEnvironment Controller", func() {
 					Namespace: devName.Namespace,
 				},
 				Spec: devenvv1.DevEnvironmentSpec{
-					Developer: "dave",
-					Branch:    "main",
+					Developer:         "dave",
+					Branch:            "main",
+					DeveloperTunnelIP: "10.8.0.2",
 					Intercepts: []devenvv1.Intercept{
 						{Service: "api-service", LocalPort: 8080},
 						{Service: "extra-service", LocalPort: 8081},
@@ -344,8 +371,28 @@ var _ = Describe("DevEnvironment Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, devEnv)).To(Succeed())
 
-			// First reconcile: creates both stubs
+			// First reconcile: creates namespace, waits for TLS secrets
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: devName})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Pre-create TLS secrets for both intercepts
+			for _, intercept := range devEnv.Spec.Intercepts {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      intercept.Service + "-stub-tls",
+						Namespace: devNS,
+					},
+					Data: map[string][]byte{
+						"tls.crt": []byte("cert"),
+						"tls.key": []byte("key"),
+						"ca.crt":  []byte("ca"),
+					},
+				}
+				Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+			}
+
+			// Second reconcile: creates both stub deployments and services
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: devName})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Remove extra-service from spec

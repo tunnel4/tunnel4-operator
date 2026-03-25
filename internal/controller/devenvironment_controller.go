@@ -321,9 +321,9 @@ func (r *DevEnvironmentReconciler) ensureStubPod(
 			Namespace: ns,
 			Labels: map[string]string{
 				"app":              intercept.Service,
-				"tun4.dev/stub":    "true",
-				"tun4.dev/env":     devEnv.Name,
-				"tun4.dev/service": intercept.Service,
+				"tunnel4.dev/stub":    "true",
+				"tunnel4.dev/env":     devEnv.Name,
+				"tunnel4.dev/service": intercept.Service,
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -331,18 +331,18 @@ func (r *DevEnvironmentReconciler) ensureStubPod(
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app":           intercept.Service,
-					"tun4.dev/stub": "true",
+					"tunnel4.dev/stub": "true",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app":           intercept.Service,
-						"tun4.dev/stub": "true",
+						"tunnel4.dev/stub": "true",
 					},
 					// Аннотация с версией secret — K8s перезапустит поды при изменении
 					Annotations: map[string]string{
-						"tun4.dev/cert-secret-version": tlsSecret.ResourceVersion,
+						"tunnel4.dev/cert-secret-version": tlsSecret.ResourceVersion,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -398,12 +398,12 @@ func (r *DevEnvironmentReconciler) ensureStubPod(
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      intercept.Service,
 			Namespace: ns,
-			Labels:    map[string]string{"tun4.dev/env": devEnv.Name},
+			Labels:    map[string]string{"tunnel4.dev/env": devEnv.Name},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
 				"app":           intercept.Service,
-				"tun4.dev/stub": "true",
+				"tunnel4.dev/stub": "true",
 			},
 			Ports: []corev1.ServicePort{{
 				Port:       8080,
