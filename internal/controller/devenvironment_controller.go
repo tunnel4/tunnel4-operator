@@ -38,6 +38,7 @@ type DevEnvironmentReconciler struct {
 //+kubebuilder:rbac:groups=devenv.tunnel4.dev,resources=devenvironments/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=devenv.tunnel4.dev,resources=devenvironments/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch;create;update;delete
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=resourcequotas,verbs=get;list;watch;create;update;patch;delete
