@@ -26,7 +26,7 @@ jobs:
 
   build-push:
     name: Build & Push
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     # needs: test
     if: github.event_name != 'pull_request'
     permissions:
