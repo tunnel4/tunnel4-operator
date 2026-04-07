@@ -3,11 +3,10 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
-	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
-	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -24,10 +23,23 @@ import (
 )
 
 const (
-	stubImage     = "docker.io/library/devenv-stub:latest"
 	finalizerName = "tunnel4.dev/finalizer"
 	idleTimeout   = 30 * time.Minute
 )
+
+func stubImage() string {
+	if v := os.Getenv("STUB_IMAGE"); v != "" {
+		return v
+	}
+	return "devenv-stub:latest"
+}
+
+func gatewayAddr() string {
+	if v := os.Getenv("GATEWAY_ADDR"); v != "" {
+		return v
+	}
+	return "tunnel4-gateway.tunnel4-system.svc.cluster.local:7777"
+}
 
 type DevEnvironmentReconciler struct {
 	client.Client
@@ -82,16 +94,6 @@ func (r *DevEnvironmentReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 // provision — create everything for env
 func (r *DevEnvironmentReconciler) provision(ctx context.Context, devEnv *devenvv1.DevEnvironment) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-
-	// Взять tunnelIP из spec
-	tunnelIP := devEnv.Spec.DeveloperTunnelIP
-	if tunnelIP == "" {
-		// Нет IP — ждать пока агент не выставит
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	}
-
-	// Записать в status для удобства
-	devEnv.Status.DeveloperTunnelIP = tunnelIP
 
 	// Update phase to Provisioning
 	if devEnv.Status.Phase == "" || devEnv.Status.Phase == devenvv1.PhaseSleeping {
@@ -270,51 +272,15 @@ func (r *DevEnvironmentReconciler) ensureStubPod(
 		Phase:     devenvv1.InterceptPending,
 	}
 
-	// 1. Создать Certificate
-	if err := r.ensureCertificate(ctx, ns, intercept.Service); err != nil {
-		status.Phase = devenvv1.InterceptError
-		status.Message = "failed to create certificate: " + err.Error()
-		return status, err
-	}
-
-	// 2. Проверить что secret с сертификатом готов
-	secretName := intercept.Service + "-stub-tls"
-	tlsSecret := &corev1.Secret{}
-	certReady := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: ns}, tlsSecret) == nil
-
-	if !certReady {
-		status.Message = "waiting for TLS certificate"
-		return status, nil
-	}
-
-	targetAddr := fmt.Sprintf("%s:%d", devEnv.Status.DeveloperTunnelIP, intercept.LocalPort)
-	quicAddr := fmt.Sprintf("%s:7777", devEnv.Status.DeveloperTunnelIP)
 	stubName := intercept.Service + "-stub"
 	replicas := int32(1)
 
 	envVars := []corev1.EnvVar{
 		{Name: "LISTEN_ADDR", Value: ":8080"},
-		{Name: "TARGET_ADDR", Value: targetAddr},
-		{Name: "QUIC_SERVER", Value: quicAddr},
-		{Name: "TLS_CERT", Value: "/certs/tls.crt"},
-		{Name: "TLS_KEY", Value: "/certs/tls.key"},
-		{Name: "TLS_CA", Value: "/certs/ca.crt"},
+		{Name: "QUIC_SERVER", Value: gatewayAddr()},
+		{Name: "SERVICE_NAME", Value: intercept.Service},
+		{Name: "SOURCE_NAMESPACE", Value: "default"},
 	}
-
-	volumes := []corev1.Volume{{
-		Name: "tls-certs",
-		VolumeSource: corev1.VolumeSource{
-			Secret: &corev1.SecretVolumeSource{
-				SecretName: secretName,
-			},
-		},
-	}}
-
-	volumeMounts := []corev1.VolumeMount{{
-		Name:      "tls-certs",
-		MountPath: "/certs",
-		ReadOnly:  true,
-	}}
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -338,22 +304,16 @@ func (r *DevEnvironmentReconciler) ensureStubPod(
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app":           intercept.Service,
+						"app":              intercept.Service,
 						"tunnel4.dev/stub": "true",
-					},
-					// Аннотация с версией secret — K8s перезапустит поды при изменении
-					Annotations: map[string]string{
-						"tunnel4.dev/cert-secret-version": tlsSecret.ResourceVersion,
 					},
 				},
 				Spec: corev1.PodSpec{
-					Volumes: volumes,
 					Containers: []corev1.Container{{
 						Name:            "stub",
-						Image:           stubImage,
+						Image:           stubImage(),
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Env:             envVars,
-						VolumeMounts:    volumeMounts,
 						Ports:           []corev1.ContainerPort{{ContainerPort: 8080}},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
@@ -568,36 +528,3 @@ func removeString(slice []string, s string) []string {
 	return result
 }
 
-func (r *DevEnvironmentReconciler) ensureCertificate(ctx context.Context, ns string, service string) error {
-	certName := service + "-stub-tls"
-
-	cert := &certmanagerv1.Certificate{}
-	err := r.Get(ctx, client.ObjectKey{Name: certName, Namespace: ns}, cert)
-	if err == nil {
-		return nil // уже существует
-	}
-	if !errors.IsNotFound(err) {
-		return err
-	}
-
-	cert = &certmanagerv1.Certificate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      certName,
-			Namespace: ns,
-		},
-		Spec: certmanagerv1.CertificateSpec{
-			SecretName: service + "-stub-tls",
-			CommonName: service + "." + ns,
-			DNSNames:   []string{service + "." + ns},
-			PrivateKey: &certmanagerv1.CertificatePrivateKey{
-				Algorithm: certmanagerv1.ECDSAKeyAlgorithm,
-				Size:      256,
-			},
-			IssuerRef: cmmeta.ObjectReference{ //nolint:staticcheck // cert-manager v1 API still requires ObjectReference
-				Name: "devenv-issuer",
-				Kind: "ClusterIssuer",
-			},
-		},
-	}
-	return r.Create(ctx, cert)
-}

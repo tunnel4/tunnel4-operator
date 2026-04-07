@@ -54,8 +54,6 @@ spec:
                 type: string
               developer:
                 type: string
-              developerTunnelIP:
-                type: string
               intercepts:
                 items:
                   properties:
@@ -73,13 +71,10 @@ spec:
             required:
             - branch
             - developer
-            - developerTunnelIP
             - intercepts
             type: object
           status:
             properties:
-              developerTunnelIP:
-                type: string
               intercepts:
                 items:
                   properties:

@@ -32,20 +32,18 @@ type InterceptStatus struct {
 }
 
 type DevEnvironmentSpec struct {
-	Developer         string      `json:"developer"`
-	Branch            string      `json:"branch"`
-	Intercepts        []Intercept `json:"intercepts"`
-	TTL               string      `json:"ttl,omitempty"`
-	DeveloperTunnelIP string      `json:"developerTunnelIP"`
+	Developer  string      `json:"developer"`
+	Branch     string      `json:"branch"`
+	Intercepts []Intercept `json:"intercepts"`
+	TTL        string      `json:"ttl,omitempty"`
 }
 
 type DevEnvironmentStatus struct {
-	Phase             DevEnvironmentPhase `json:"phase,omitempty"`
-	Namespace         string              `json:"namespace,omitempty"`
-	DeveloperTunnelIP string              `json:"developerTunnelIP,omitempty"`
-	Message           string              `json:"message,omitempty"`
-	LastHeartbeat     metav1.Time         `json:"lastHeartbeat,omitempty"`
-	Intercepts        []InterceptStatus   `json:"intercepts,omitempty"`
+	Phase         DevEnvironmentPhase `json:"phase,omitempty"`
+	Namespace     string              `json:"namespace,omitempty"`
+	Message       string              `json:"message,omitempty"`
+	LastHeartbeat metav1.Time         `json:"lastHeartbeat,omitempty"`
+	Intercepts    []InterceptStatus   `json:"intercepts,omitempty"`
 }
 
 //+kubebuilder:object:root=true
